@@ -95,19 +95,18 @@ func Run(ctx context.Context, config string) error {
 	default:
 		return fmt.Errorf("provided invalid command/http verb: %q", conf.Verb)
 	}
-	
-	if conf.ContentType == "empty"{
-		req, err := http.NewRequestWithContext(ctx, requestType, conf.URL, nil)
-		if err != nil {
-			return fmt.Errorf("encounted error while creating request: %v", err.Error())
-			}
-	}else{
-		body := []byte(conf.Body)
-		req, err := http.NewRequestWithContext(ctx, requestType, conf.URL, bytes.NewBuffer(body))
+	var req *http.Request
+	if conf.ContentType == "empty" {
+		req, err = http.NewRequestWithContext(ctx, requestType, conf.URL, nil)
 		if err != nil {
 			return fmt.Errorf("encounted error while creating request: %v", err.Error())
 		}
-		req.Header.Add("Content-Type",conf.ContentType)
+	} else {
+		req, err = http.NewRequestWithContext(ctx, requestType, conf.URL, bytes.NewBufferString(conf.Body))
+		if err != nil {
+			return fmt.Errorf("encounted error while creating request: %v", err.Error())
+		}
+		req.Header.Add("Content-Type", conf.ContentType)
 	}
 
 	tls_config := &tls.Config{InsecureSkipVerify: conf.Insecure}
