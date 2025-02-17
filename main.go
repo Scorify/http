@@ -59,6 +59,18 @@ func Validate(config string) error {
 			return fmt.Errorf("invalid status code provided: %d", status_code)
 		}
 	}
+	
+	if conf.ContentType == "empty" && conf.Body != "" {
+		return fmt.Errorf("body must not be provided when using empty Content-Type; got: %v", conf.Body)
+	}
+
+	if conf.ContentType != "empty" && conf.Body == "" {
+		return fmt.Errorf("body must be provided when using non-empty Content-Type; got: %v", conf.Body)
+	}
+
+	if !slices.Contains([]string{"plain/text", "application/json", "x-www-form-urlencoded", "empty"}, conf.ContentType) {
+		return fmt.Errorf("invalid content type provided: %v", conf.ContentType)
+	}
 
 	return nil
 }
