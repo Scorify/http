@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"bytes"
 
 	"github.com/scorify/schema"
 )
@@ -20,6 +21,8 @@ type Schema struct {
 	ExpectedOutput string `key:"expected_output"`
 	MatchType      string `key:"match_type" default:"statusCode" enum:"statusCode,substringMatch,exactMatch,regexMatch"`
 	Insecure       bool   `key:"insecure"`
+	Body	       string `key:"body"`
+	ContentType    string `key:"content_type" default:"empty" enum:"plain/text,application/json,x-www-form-urlencoded,empty"`
 }
 
 func Validate(config string) error {
@@ -55,6 +58,18 @@ func Validate(config string) error {
 		if status_code < 100 || status_code > 599 {
 			return fmt.Errorf("invalid status code provided: %d", status_code)
 		}
+	}
+	
+	if conf.ContentType == "empty" && conf.Body != "" {
+		return fmt.Errorf("body must not be provided when using empty Content-Type; got: %v", conf.Body)
+	}
+
+	if conf.ContentType != "empty" && conf.Body == "" {
+		return fmt.Errorf("body must be provided when using non-empty Content-Type; got: %v", conf.Body)
+	}
+
+	if !slices.Contains([]string{"plain/text", "application/json", "x-www-form-urlencoded", "empty"}, conf.ContentType) {
+		return fmt.Errorf("invalid content type provided: %v", conf.ContentType)
 	}
 
 	return nil
@@ -92,10 +107,18 @@ func Run(ctx context.Context, config string) error {
 	default:
 		return fmt.Errorf("provided invalid command/http verb: %q", conf.Verb)
 	}
-
-	req, err := http.NewRequestWithContext(ctx, requestType, conf.URL, nil)
-	if err != nil {
-		return fmt.Errorf("encounted error while creating request: %v", err.Error())
+	var req *http.Request
+	if conf.ContentType == "empty" {
+		req, err = http.NewRequestWithContext(ctx, requestType, conf.URL, nil)
+		if err != nil {
+			return fmt.Errorf("encounted error while creating request: %v", err.Error())
+		}
+	} else {
+		req, err = http.NewRequestWithContext(ctx, requestType, conf.URL, bytes.NewBufferString(conf.Body))
+		if err != nil {
+			return fmt.Errorf("encounted error while creating request: %v", err.Error())
+		}
+		req.Header.Add("Content-Type", conf.ContentType)
 	}
 
 	tls_config := &tls.Config{InsecureSkipVerify: conf.Insecure}
